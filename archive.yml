@@ -1,4 +1,9 @@
 files:
+  - source: "https://github.com/mattn/efm-langserver/archive/refs/tags/v{{version}}.tar.gz"
+    kind: "go-vendor"
+    output: "efm-langserver-{{version}}-vendor.tar.xz"
+    values:
+      - version: "0.0.55"
   - source: "https://chromium.googlesource.com/chromium/src/third_party/rust/+archive/{{commit}}.tar.gz"
     kind: "download"
     output: "chromium-third-party-rust-{{commit}}.tar.gz"
