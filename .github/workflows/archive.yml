@@ -23,7 +23,9 @@ jobs:
       - name: Install yq
         uses: mikefarah/yq@master
 
-      - name: Process files
+      - name: Process files and create releases
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           mkdir -p dist cache
@@ -32,18 +34,21 @@ jobs:
           for ((i = 0; i < ${file_count}; i++)); do
             source=$(yq ".files[${i}].source" archive.yml)
             output=$(yq ".files[${i}].output" archive.yml)
+            tag=$(yq ".files[${i}].tag" archive.yml)
             kind=$(yq ".files[${i}].kind" archive.yml)
 
             value_count=$(yq ".files[${i}].values | length" archive.yml)
             for ((j = 0; j < ${value_count}; j++)); do
               resolved_source="${source}"
               resolved_output="${output}"
+              resolved_tag="${tag}"
 
               keys=$(yq -r ".files[${i}].values[${j}] | keys | .[]" archive.yml)
               for key in ${keys}; do
                 value=$(yq -r ".files[${i}].values[${j}].${key}" archive.yml)
                 resolved_source="${resolved_source//\{\{${key}\}\}/${value}}"
                 resolved_output="${resolved_output//\{\{${key}\}\}/${value}}"
+                resolved_tag="${resolved_tag//\{\{${key}\}\}/${value}}"
               done
 
               if [[ -f "cache/${resolved_output}.cached" ]]; then
@@ -74,20 +79,12 @@ jobs:
                   ;;
               esac
 
+              gh release create "${resolved_tag}" --title "${resolved_tag}" --notes "Automated archive release" 2>/dev/null || true
+              gh release upload "${resolved_tag}" "dist/${resolved_output}" --clobber
+
               touch "cache/${resolved_output}.cached"
             done
           done
-
-      - name: Create release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if [ -z "$(ls -A dist 2>/dev/null)" ]; then
-            echo "No new files to release"
-            exit 0
-          fi
-          tag="$(date -u +%Y%m%d%H%M%S)"
-          gh release create "${tag}" dist/* --title "${tag}" --notes "Automated archive release"
 
       - name: Commit cache
         run: |
