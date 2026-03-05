@@ -1,0 +1,101 @@
+name: Archive
+
+on:
+  push:
+    branches: [trunk]
+    paths:
+      - archive.yml
+
+permissions:
+  contents: write
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Install yq
+        uses: mikefarah/yq@master
+
+      - name: Process files
+        run: |
+          set -euo pipefail
+          mkdir -p dist cache
+
+          file_count=$(yq '.files | length' archive.yml)
+          for ((i = 0; i < ${file_count}; i++)); do
+            source=$(yq ".files[${i}].source" archive.yml)
+            output=$(yq ".files[${i}].output" archive.yml)
+            kind=$(yq ".files[${i}].kind" archive.yml)
+
+            value_count=$(yq ".files[${i}].values | length" archive.yml)
+            for ((j = 0; j < ${value_count}; j++)); do
+              resolved_source="${source}"
+              resolved_output="${output}"
+
+              keys=$(yq -r ".files[${i}].values[${j}] | keys | .[]" archive.yml)
+              for key in ${keys}; do
+                value=$(yq -r ".files[${i}].values[${j}].${key}" archive.yml)
+                resolved_source="${resolved_source//\{\{${key}\}\}/${value}}"
+                resolved_output="${resolved_output//\{\{${key}\}\}/${value}}"
+              done
+
+              if [[ -f "cache/${resolved_output}.cached" ]]; then
+                echo "Skipping (cached): ${resolved_output}"
+                continue
+              fi
+
+              echo "Processing: ${resolved_source} -> ${resolved_output}"
+
+              case "${kind}" in
+                download)
+                  curl -fSL "${resolved_source}" -o "dist/${resolved_output}"
+                  ;;
+                go-vendor)
+                  tmpdir=$(mktemp -d)
+                  curl -fSL "${resolved_source}" -o "${tmpdir}/source.tar.gz"
+                  tar -xf "${tmpdir}/source.tar.gz" -C "${tmpdir}"
+                  root=$(find "${tmpdir}" -mindepth 1 -maxdepth 1 -type d | head -n1)
+                  cd "${root}"
+                  go mod vendor
+                  cd - > /dev/null
+                  tar --create --auto-compress --file "dist/${resolved_output}" -C "${root}" vendor
+                  rm -rf "${tmpdir}"
+                  ;;
+                *)
+                  echo "Unknown kind: ${kind}"
+                  exit 1
+                  ;;
+              esac
+
+              touch "cache/${resolved_output}.cached"
+            done
+          done
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -z "$(ls -A dist 2>/dev/null)" ]; then
+            echo "No new files to release"
+            exit 0
+          fi
+          tag="$(date -u +%Y%m%d%H%M%S)"
+          gh release create "${tag}" dist/* --title "${tag}" --notes "Automated archive release"
+
+      - name: Commit cache
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add cache/
+          if git diff --cached --quiet; then
+            echo "No cache changes to commit"
+          else
+            git commit -m "Update archive cache"
+            git push
+          fi
