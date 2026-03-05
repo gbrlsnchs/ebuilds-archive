@@ -63,15 +63,16 @@ jobs:
                   curl -fSL "${resolved_source}" -o "dist/${resolved_output}"
                   ;;
                 go-vendor)
-                  tmpdir=$(mktemp -d)
+                  root="$(pwd)"
+                  tmpdir="$(mktemp -d)"
                   curl -fSL "${resolved_source}" -o "${tmpdir}/source.tar.gz"
                   tar -xf "${tmpdir}/source.tar.gz" -C "${tmpdir}"
-                  root=$(find "${tmpdir}" -mindepth 1 -maxdepth 1 -type d | head -n1)
-                  cd "${root}"
+                  cd "${tmpdir}/${resolved_tag}"
                   go mod vendor
-                  cd - > /dev/null
-                  tar --create --auto-compress --file "dist/${resolved_output}" -C "${root}" vendor
+                  cd ..
+                  tar --create --auto-compress --file "${root}/dist/${resolved_output}" "${resolved_tag}/vendor"
                   rm -rf "${tmpdir}"
+                  cd "${root}"
                   ;;
                 *)
                   echo "Unknown kind: ${kind}"
