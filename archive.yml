@@ -18,7 +18,7 @@ files:
     values:
       - commit: "30eb036e9b2f181dda31bde6f20d2a4983e380b9"
         version: "2.7.2"
-  - source: "https://github.com/radulucut/cleed/archive/tags/v{{version}}.tar.gz"
+  - source: "https://github.com/radulucut/cleed/archive/refs/tags/v{{version}}.tar.gz"
     kind: "go-vendor"
     tag: "cleed-{{version}}"
     output: "cleed-{{version}}-vendor.tar.xz"
