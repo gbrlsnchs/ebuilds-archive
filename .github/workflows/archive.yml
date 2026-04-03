@@ -74,6 +74,17 @@ jobs:
                   rm -rf "${tmpdir}"
                   cd "${root}"
                   ;;
+                go-deps)
+                  root="$(pwd)"
+                  tmpdir="$(mktemp -d)"
+                  curl -fSL "${resolved_source}" -o "${tmpdir}/source.tar.gz"
+                  tar -xf "${tmpdir}/source.tar.gz" -C "${tmpdir}"
+                  cd "${tmpdir}/${resolved_tag}"
+                  GOMODCACHE="${PWD}"/go-mod go mod download -modcacherw -x
+                  tar --create --auto-compress --file "${root}/dist/${resolved_output}" go-mod
+                  rm -rf "${tmpdir}"
+                  cd "${root}"
+                  ;;
                 *)
                   echo "Unknown kind: ${kind}"
                   exit 1
