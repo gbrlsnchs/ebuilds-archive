@@ -24,3 +24,9 @@ files:
     output: "cleed-{{version}}-vendor.tar.xz"
     values:
       - version: "0.4.4"
+  - source: "https://github.com/opentofu/tofu-ls/archive/refs/tags/v{{version}}.tar.gz"
+    kind: "go-vendor"
+    tag: "tofu-ls-{{version}}"
+    output: "tofu-ls-{{version}}-vendor.tar.xz"
+    values:
+      - version: "0.5.0"
